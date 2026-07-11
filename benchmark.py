@@ -1,5 +1,7 @@
 import time
 import statistics
+import matplotlib.pyplot as plt
+import os
 
 from limiters.token_bucket import TokenBucket
 from limiters.sliding_window_log import SlidingWindowLog
@@ -202,6 +204,53 @@ def benchmark_memory_usage(limit: int = 1000):
     return results
 
 
+
+
+def generate_graphs(throughput, memory, bursty):
+    os.makedirs("results", exist_ok=True)
+    names = list(throughput.keys())
+    colors = ["#4C72B0", "#DD8452", "#55A868"]  # blue, orange, green
+
+    # --- Graph 1: Throughput ---
+    plt.figure(figsize=(8, 5))
+    plt.bar(names, [throughput[n] for n in names], color=colors)
+    plt.title("Raw Throughput (calls/sec)")
+    plt.ylabel("Calls per second")
+    plt.xticks(rotation=15)
+    plt.tight_layout()
+    plt.savefig("results/throughput.png")
+    plt.close()
+
+    # --- Graph 2: Memory usage ---
+    plt.figure(figsize=(8, 5))
+    plt.bar(names, [memory[n] for n in names], color=colors)
+    plt.title("Memory Usage After 1,000 Requests (bytes)")
+    plt.ylabel("Bytes")
+    plt.xticks(rotation=15)
+    plt.tight_layout()
+    plt.savefig("results/memory_usage.png")
+    plt.close()
+
+    # --- Graph 3: Accuracy under bursty traffic ---
+    plt.figure(figsize=(8, 5))
+    allowed = [bursty[n]["allowed"] for n in names]
+    total = bursty[names[0]]["total"]  # same for all
+    plt.bar(names, allowed, color=colors)
+    plt.axhline(y=total, color="red", linestyle="--", label=f"Total requests sent ({total})")
+    plt.title("Requests Allowed Under Bursty Traffic")
+    plt.ylabel("Requests allowed")
+    plt.xticks(rotation=15)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("results/bursty_accuracy.png")
+    plt.close()
+
+    print("\nGraphs saved to results/ folder:")
+    print("  - results/throughput.png")
+    print("  - results/memory_usage.png")
+    print("  - results/bursty_accuracy.png")
+
+
 if __name__ == "__main__":
     throughput_results = benchmark_throughput()
     throughput_high_limit_results = benchmark_throughput_high_limit()
@@ -217,3 +266,5 @@ if __name__ == "__main__":
     print("Memory usage (bytes):", memory_results)
     print("Steady traffic (allowed/total):", steady_results)
     print("Bursty traffic (allowed/total):", bursty_results)
+
+    generate_graphs(throughput_results, memory_results, bursty_results)
