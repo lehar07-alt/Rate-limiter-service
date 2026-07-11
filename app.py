@@ -16,7 +16,7 @@ ALGORITHM = "token_bucket"
 # roughly "5 requests per second, with some burst allowance"
 LIMIT = 5              # max requests per window / bucket capacity
 WINDOW_SECONDS = 1      # window size (used by the two sliding-window algos)
-REFILL_RATE = 5         # tokens per second (used by token bucket only)
+REFILL_RATE = 5        # tokens per second (used by token bucket only)
 
 app = FastAPI()
 
