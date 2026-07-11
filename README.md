@@ -17,6 +17,15 @@ Rate limiters are a foundational system-design building block, used by nearly ev
 - [Key Takeaways](#key-takeaways)
 - [Project Structure](#project-structure)
 
+## Tech Stack
+
+- Python 3.11
+- FastAPI
+- Pytest
+- Matplotlib
+- collections.deque
+- time
+
 ## Algorithms
 
 | Algorithm | How it works | Memory | Accuracy |
@@ -27,40 +36,70 @@ Rate limiters are a foundational system-design building block, used by nearly ev
 
 All three are implemented as standalone, framework-agnostic classes with no dependency on the web layer, so they can be unit tested and benchmarked in isolation before ever touching HTTP.
 
+## Time & Space Complexity
+
+| Algorithm | Request Time | Space Complexity | Notes |
+|-----------|-------------:|-----------------:|-------|
+| **Token Bucket** | **O(1)** | **O(1)** | Maintains only the current token count and last refill timestamp. Supports bursty traffic efficiently. |
+| **Sliding Window Log** | **Amortized O(1)** | **O(n)** | Stores one timestamp per request in the active window. Expired timestamps are removed from the front of a deque. |
+| **Sliding Window Counter** | **O(1)** | **O(1)** | Uses only two counters (current and previous window) and a weighted approximation of the rolling window. |
+
+> **Note:** The Sliding Window Log has **amortized O(1)** request processing because each timestamp is inserted and removed exactly once. However, its memory usage grows linearly with the number of requests in the active window.
+
 ## Architecture
 
-Client Request
-│
-▼
-FastAPI Middleware (app.py)
-│  identifies client (IP), fetches/creates their limiter instance
-▼
-Limiter.allow_request()  ──►  True  ──► request proceeds normally
-│
-└────────────────────►  False ──► 429 Too Many Requests
+```text
+                Client Request
+                      │
+                      ▼
+        FastAPI Middleware (app.py)
+                      │
+          identify client (IP)
+                      │
+                      ▼
+        Limiter.allow_request()
+             │             │
+         True │             │ False
+             ▼             ▼
+     Request proceeds   HTTP 429
+```
 
 Each client is tracked independently via a per-client limiter instance, so one user hitting their limit never affects another. The algorithm used is configurable via a single constant in `app.py`, which is what makes it possible to benchmark all three against identical infrastructure.
+
+## Features
+
+- Implements Token Bucket, Sliding Window Log, and Sliding Window Counter
+- FastAPI middleware integration
+- Per-client rate limiting
+- Unit tests using Pytest
+- Benchmark suite for throughput, latency, memory, and accuracy
+- Comparison plots generated with Matplotlib
 
 ## Setup & Usage
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/rate-limiter-service.git
+git clone https://github.com/lehar07-alt/rate-limiter-service.git
 cd rate-limiter-service
 
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+
+# Linux / macOS
+source venv/bin/activate
+
+# Windows
+venv\Scripts\activate
+
 
 pip install fastapi uvicorn pytest matplotlib
 ```
 
 **Run the test suite:**
 ```bash
-pytest tests/ -v
+python -m pytest tests/ -v
 ```
 
 **Run the API:**
 ```bash
-uvicorn app:app --reload
+python -m uvicorn app:app --reload
 ```
 Then send repeated requests to `http://127.0.0.1:8000/` — after the configured limit, responses switch from `200 OK` to `429 Too Many Requests`. Change which algorithm is active by editing `ALGORITHM` in `app.py`.
 
@@ -108,20 +147,32 @@ Simulated 3 bursts of 20 requests, 1 second apart, against a limit of 10 request
 - **Sliding Window Log** — best when exact enforcement matters more than memory cost (e.g. billing-sensitive limits), or when per-window traffic volume is naturally low.
 - **Sliding Window Counter** — a practical middle ground: constant memory with reasonably close accuracy, at the cost of some imprecision near window boundaries.
 
-## Project Structure
 
-rate-limiter-service/
-├── limiters/                    # Framework-agnostic algorithm implementations
-│   ├── token_bucket.py
-│   ├── sliding_window_log.py
-│   └── sliding_window_counter.py
-├── tests/                       # Unit tests per algorithm
-├── app.py                       # FastAPI app using the limiters as middleware
-├── benchmark.py                 # Benchmark suite + graph generation
-├── results/                     # Generated benchmark graphs (PNG)
-├── LICENSE
-└── README.md
+
+## Project Structure
+```
+  rate-limiter-service/
+  ├── limiters/                    # Framework-agnostic algorithm implementations
+  │   ├── token_bucket.py
+  │   ├── sliding_window_log.py
+  │   └── sliding_window_counter.py
+  ├── tests/                       # Unit tests per algorithm
+  ├── app.py                       # FastAPI app using the limiters as middleware
+  ├── benchmark.py                 # Benchmark suite + graph generation
+  ├── results/                     # Generated benchmark graphs (PNG)
+  ├── LICENSE
+  └── README.md
+```
 
 ## License
 
 MIT — see [LICENSE](LICENSE) for details.
+
+## Future Improvements
+
+- Redis-backed distributed rate limiting
+- Async middleware support
+- Configurable rate limits via YAML
+- Prometheus metrics
+- Docker deployment
+- CI/CD with GitHub Actions
